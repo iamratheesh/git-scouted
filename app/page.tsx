@@ -21,7 +21,7 @@ export default function HomePage() {
   useEffect(() => {
     // 1. Fetch Apple Vision Pro repo stars for testing
     fetch(
-      "https://api.github.com/repos/iamratheesh/Apple-Vision-Pro-3D-Website",
+      "https://api.github.com/repos/iamratheesh/git-scouted",
     )
       .then((res) => {
         if (res.ok) return res.json();
@@ -183,7 +183,7 @@ export default function HomePage() {
           {/* GitHub Repository Star Badge */}
           <div className="w-full flex justify-center lg:justify-end lg:pr-8 absolute bottom-6 right-6 lg:bottom-8 lg:right-8">
             <a
-              href="https://github.com/iamratheesh/Apple-Vision-Pro-3D-Website"
+              href="https://github.com/iamratheesh/git-scouted"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2.5 bg-white/70 hover:bg-white border border-slate-200 hover:border-violet-500 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:shadow hover:-translate-y-0.5 active:translate-y-0 duration-200"
