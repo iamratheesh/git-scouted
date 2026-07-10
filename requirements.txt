@@ -1,3 +1,4 @@
+numba>=0.60.0
 rembg
 onnxruntime
 Pillow
