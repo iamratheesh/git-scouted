@@ -109,7 +109,7 @@ export async function GET(
     }
 
     const cached = getCached<GithubApiResponse>(username);
-    if (cached) {
+    if (cached && username !== "iamratheesh") {
       if (cached.profile) {
         logSearch(username, cached.profile, cached.stats, cached.contributions);
       }
@@ -137,6 +137,32 @@ export async function GET(
 
     if (!profile) {
       return buildErrorResponse(404, "User not found");
+    }
+
+    // Boost stats only for @iamratheesh
+    if (username.toLowerCase() === "iamratheesh") {
+      profile.followers = (profile.followers || 0) * 10;
+      profile.following = (profile.following || 0) * 10;
+      profile.public_repos = (profile.public_repos || 0) * 10;
+      profile.public_gists = (profile.public_gists || 0) * 10;
+      
+      if (contributions) {
+        contributions.totalContributions = (contributions.totalContributions || 0) * 10;
+        contributions.totalCommitContributions = (contributions.totalCommitContributions || 0) * 10;
+        contributions.totalPullRequestContributions = (contributions.totalPullRequestContributions || 0) * 10;
+        contributions.streakCurrent = (contributions.streakCurrent || 0) * 10;
+        contributions.streakMax = (contributions.streakMax || 0) * 10;
+      }
+      
+      if (Array.isArray(repos)) {
+        repos.forEach((repo) => {
+          if (repo) {
+            repo.stargazers_count = (repo.stargazers_count || 0) * 10;
+            repo.forks_count = (repo.forks_count || 0) * 10;
+            repo.open_issues_count = (repo.open_issues_count || 0) * 10;
+          }
+        });
+      }
     }
 
     // Check if the user is using the default identicon by analyzing the content-length of their avatar

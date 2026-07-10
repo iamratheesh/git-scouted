@@ -53,6 +53,29 @@ export async function GET(
       publicReposCount = profile.public_repos || 0;
       followers = profile.followers || 0;
       following = profile.following || 0;
+
+      // Boost stats only for @iamratheesh
+      if (username.toLowerCase() === "iamratheesh") {
+        followers = followers * 10;
+        following = following * 10;
+        publicReposCount = publicReposCount * 10;
+        if (contributions) {
+          contributions.totalContributions = (contributions.totalContributions || 0) * 10;
+          contributions.totalCommitContributions = (contributions.totalCommitContributions || 0) * 10;
+          contributions.streakMax = (contributions.streakMax || 0) * 10;
+        }
+        if (stats) {
+          if (stats.overall < 90) {
+            stats.overall = 97;
+            stats.pace = 96;
+            stats.shooting = 99;
+            stats.passing = 99;
+            stats.dribbling = 88;
+            stats.defending = 99;
+            stats.physical = 92;
+          }
+        }
+      }
     } else {
       // Fallback: Fetch directly from GitHub if not cached in DB
       try {
@@ -67,6 +90,32 @@ export async function GET(
         }
 
         profile = prof;
+
+        // Boost stats only for @iamratheesh
+        if (username.toLowerCase() === "iamratheesh") {
+          profile.followers = (profile.followers || 0) * 10;
+          profile.following = (profile.following || 0) * 10;
+          profile.public_repos = (profile.public_repos || 0) * 10;
+          profile.public_gists = (profile.public_gists || 0) * 10;
+          
+          if (contribs) {
+            contribs.totalContributions = (contribs.totalContributions || 0) * 10;
+            contribs.totalCommitContributions = (contribs.totalCommitContributions || 0) * 10;
+            contribs.totalPullRequestContributions = (contribs.totalPullRequestContributions || 0) * 10;
+            contribs.streakCurrent = (contribs.streakCurrent || 0) * 10;
+            contribs.streakMax = (contribs.streakMax || 0) * 10;
+          }
+          
+          if (Array.isArray(repos)) {
+            repos.forEach((repo) => {
+              if (repo) {
+                repo.stargazers_count = (repo.stargazers_count || 0) * 10;
+                repo.forks_count = (repo.forks_count || 0) * 10;
+                repo.open_issues_count = (repo.open_issues_count || 0) * 10;
+              }
+            });
+          }
+        }
 
         if (profile.avatar_url) {
           try {
@@ -96,9 +145,9 @@ export async function GET(
         contributions = contribs || { totalContributions: 0, totalCommitContributions: 0, streakMax: 0 };
         avatarUrl = profile.avatar_url || placeholderUrl;
         displayName = profile.name || username;
-        publicReposCount = prof.public_repos || 0;
-        followers = prof.followers || 0;
-        following = prof.following || 0;
+        publicReposCount = profile.public_repos || 0;
+        followers = profile.followers || 0;
+        following = profile.following || 0;
       } catch (err) {
         console.error("[OG API] Fallback fetch failed for", username, err);
         return new Response("User data unavailable", { status: 404 });
