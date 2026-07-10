@@ -107,7 +107,7 @@ const FifaCard = forwardRef<HTMLElement, FifaCardProps>(function FifaCard(
       })
       .catch(() => {
         if (isMounted) {
-          setProcessedAvatarSrc(avatarSrc);
+          setProcessedAvatarSrc("/assets/placeholderforProfile.png");
         }
       });
 
