@@ -85,7 +85,19 @@ export default function UserProfileCardPage({
   const normalizedUsername = username.trim().toLowerCase();
   const [result, setResult] = useState<ApiResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAvatarReady, setIsAvatarReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Safety timeout to prevent infinite loading screen
+  useEffect(() => {
+    if (!loading && !isAvatarReady && result) {
+      const timer = setTimeout(() => {
+        setIsAvatarReady(true);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, isAvatarReady, result]);
+
   const [exporting, setExporting] = useState(false);
   const [cardFrame, setCardFrame] = useState("/redframe.png");
   const [shareUrl, setShareUrl] = useState("");
@@ -180,6 +192,7 @@ export default function UserProfileCardPage({
 
       if (isActive) {
         setLoading(true);
+        setIsAvatarReady(false);
         setError(null);
         setResult(null);
       }
@@ -212,13 +225,7 @@ export default function UserProfileCardPage({
 
         setResult(data);
         setError(null);
-
-        // Success delay to allow processing
-        setTimeout(() => {
-          if (isActive) {
-            setLoading(false);
-          }
-        }, 2000);
+        setLoading(false);
       } catch {
         if (isActive) {
           setResult(null);
@@ -303,76 +310,10 @@ export default function UserProfileCardPage({
       </div>
 
       <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-4 py-12">
-        <div className="w-full max-w-3xl space-y-8 z-10">
-          {/* Top row deck controllers */}
-          <div className="flex justify-between items-center w-full">
-            {/* Left Side: Deck ID Badge */}
-            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm select-none">
-              <svg
-                className="w-3.5 h-3.5 text-slate-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
-                />
-              </svg>
-              <span>Deck #{statsData.totalCreated || "..."}</span>
-            </div>
-
-            {/* Right Side: Shuffle Button */}
-            <button
-              onClick={handleShuffleDeck}
-              className="group flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-500 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:shadow duration-200 select-none cursor-pointer"
-            >
-              <svg
-                className="w-3.5 h-3.5 text-slate-500 transition-transform group-hover:rotate-45"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                />
-              </svg>
-              <span>Shuffle Deck</span>
-            </button>
-          </div>
-
-          {/* Header Title Section */}
-          <div className="space-y-3 text-center flex flex-col items-center select-none">
-            {/* Header tag */}
-            <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.2em] text-slate-400 uppercase">
-              GitHub Player Card
-            </p>
-
-            {/* Title */}
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bebas-neue tracking-wide text-slate-800 drop-shadow-sm leading-none flex items-center justify-center gap-2 uppercase">
-              <span>@{normalizedUsername || "username"}</span>
-              <svg
-                className="w-6 h-6 sm:w-7 sm:h-7 text-[#7C3AED] fill-current shrink-0 self-center drop-shadow-[0_1.5px_3px_rgba(124,58,237,0.3)] transition-transform hover:scale-110 duration-200"
-                viewBox="0 0 24 24"
-              >
-                <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.936.1-1.354.268C14.77 2.515 13.51 1.7 12 1.7c-1.51 0-2.77.815-3.42 2.078C8.162 3.61 7.706 3.51 7.228 3.51 5.12 3.51 3.41 5.29 3.41 7.5c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .936-.1 1.354-.268.65 1.263 1.91 2.078 3.42 2.078 1.51 0 2.77-.815 3.42-2.078.418.168.874.268 1.354.268 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6zm-12.893 4.29L6.15 13.333c-.356-.35-.356-.917 0-1.268.357-.35.937-.35 1.293 0l2.164 2.126 5.86-5.753c.356-.35.936-.35 1.293 0 .356.35.356.918 0 1.268l-6.507 6.388c-.178.175-.412.263-.646.263s-.468-.088-.646-.263z" />
-              </svg>
-            </h1>
-
-            {/* Subheading */}
-            <p className="text-sm text-slate-500 font-medium font-sans max-w-md">
-              Your GitHub stats, turned into a player card.
-            </p>
-          </div>
-
-          {loading ? (
-            <LoadingState />
-          ) : error ? (
+        {loading ? (
+          <LoadingState />
+        ) : error ? (
+          <div className="w-full max-w-3xl space-y-8 z-10">
             <div className="space-y-4">
               <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-6 text-center text-rose-800">
                 <p className="text-base font-semibold">{error}</p>
@@ -382,30 +323,100 @@ export default function UserProfileCardPage({
               </div>
               <ErrorState />
             </div>
-          ) : result?.profile && result.stats ? (
-            (() => {
-              const totalStars = result.repos.reduce(
-                (acc, r) => acc + r.stargazers_count,
-                0,
-              );
-              const distinctLanguages = new Set(
-                result.repos.map((r) => r.language).filter(Boolean),
-              ).size;
+          </div>
+        ) : result?.profile && result.stats ? (
+          <>
+            {!isAvatarReady && <LoadingState />}
+            <div className={isAvatarReady ? "w-full max-w-3xl space-y-8 z-10" : "absolute -top-[9999px] -left-[9999px] opacity-0 pointer-events-none"}>
+              {/* Top row deck controllers */}
+              <div className="flex justify-between items-center w-full">
+                {/* Left Side: Deck ID Badge */}
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm select-none">
+                  <svg
+                    className="w-3.5 h-3.5 text-slate-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+                    />
+                  </svg>
+                  <span>Deck #{statsData.totalCreated || "..."}</span>
+                </div>
 
-              // Calculate top language
-              const langCounts: Record<string, number> = {};
-              let topLanguage = "None";
-              let maxLangCount = 0;
-              result.repos.forEach((repo) => {
-                if (repo.language) {
-                  langCounts[repo.language] =
-                    (langCounts[repo.language] || 0) + 1;
-                  if (langCounts[repo.language] > maxLangCount) {
-                    maxLangCount = langCounts[repo.language];
-                    topLanguage = repo.language;
+                {/* Right Side: Shuffle Button */}
+                <button
+                  onClick={handleShuffleDeck}
+                  className="group flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-500 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:shadow duration-200 select-none cursor-pointer"
+                >
+                  <svg
+                    className="w-3.5 h-3.5 text-slate-500 transition-transform group-hover:rotate-45"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                    />
+                  </svg>
+                  <span>Shuffle Deck</span>
+                </button>
+              </div>
+
+              {/* Header Title Section */}
+              <div className="space-y-3 text-center flex flex-col items-center select-none">
+                {/* Header tag */}
+                <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.2em] text-slate-400 uppercase">
+                  GitHub Player Card
+                </p>
+
+                {/* Title */}
+                <h1 className="text-5xl sm:text-6xl md:text-7xl font-bebas-neue tracking-wide text-slate-800 drop-shadow-sm leading-none flex items-center justify-center gap-2 uppercase">
+                  <span>@{normalizedUsername || "username"}</span>
+                  <svg
+                    className="w-6 h-6 sm:w-7 sm:h-7 text-[#7C3AED] fill-current shrink-0 self-center drop-shadow-[0_1.5px_3px_rgba(124,58,237,0.3)] transition-transform hover:scale-110 duration-200"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.936.1-1.354.268C14.77 2.515 13.51 1.7 12 1.7c-1.51 0-2.77.815-3.42 2.078C8.162 3.61 7.706 3.51 7.228 3.51 5.12 3.51 3.41 5.29 3.41 7.5c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .936-.1 1.354-.268.65 1.263 1.91 2.078 3.42 2.078 1.51 0 2.77-.815 3.42-2.078.418.168.874.268 1.354.268 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6zm-12.893 4.29L6.15 13.333c-.356-.35-.356-.917 0-1.268.357-.35.937-.35 1.293 0l2.164 2.126 5.86-5.753c.356-.35.936-.35 1.293 0 .356.35.356.918 0 1.268l-6.507 6.388c-.178.175-.412.263-.646.263s-.468-.088-.646-.263z" />
+                  </svg>
+                </h1>
+
+                {/* Subheading */}
+                <p className="text-sm text-slate-500 font-medium font-sans max-w-md">
+                  Your GitHub stats, turned into a player card.
+                </p>
+              </div>
+
+              {(() => {
+                const totalStars = result.repos.reduce(
+                  (acc, r) => acc + r.stargazers_count,
+                  0,
+                );
+                const distinctLanguages = new Set(
+                  result.repos.map((r) => r.language).filter(Boolean),
+                ).size;
+
+                // Calculate top language
+                const langCounts: Record<string, number> = {};
+                let topLanguage = "None";
+                let maxLangCount = 0;
+                result.repos.forEach((repo) => {
+                  if (repo.language) {
+                    langCounts[repo.language] =
+                      (langCounts[repo.language] || 0) + 1;
+                    if (langCounts[repo.language] > maxLangCount) {
+                      maxLangCount = langCounts[repo.language];
+                      topLanguage = repo.language;
+                    }
                   }
-                }
-              });
+                });
 
               // Calculate account age
               const accountAgeYears = result.profile.created_at
@@ -477,6 +488,7 @@ export default function UserProfileCardPage({
                         repos={result.repos}
                         cardFrame={cardFrame}
                         langIconDataUrl={result.langIconDataUrl}
+                        onReady={() => setIsAvatarReady(true)}
                       />
                       <FifaCardBack
                         ref={backCardRef}
@@ -618,11 +630,12 @@ export default function UserProfileCardPage({
                   </div>
                 </div>
               );
-            })()
-          ) : (
-            <ErrorState />
-          )}
-        </div>
+            })()}
+            </div>
+          </>
+        ) : (
+          <ErrorState />
+        )}
       </div>
     </main>
   );

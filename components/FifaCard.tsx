@@ -10,6 +10,7 @@ type FifaCardProps = {
   repos: GitHubRepo[];
   cardFrame?: string;
   langIconDataUrl?: string;
+  onReady?: () => void;
 };
 
 const FRAMES = [
@@ -65,7 +66,7 @@ function getLanguageIconId(language: string): string {
 }
 
 const FifaCard = forwardRef<HTMLElement, FifaCardProps>(function FifaCard(
-  { profile, stats, repos, cardFrame: propCardFrame, langIconDataUrl },
+  { profile, stats, repos, cardFrame: propCardFrame, langIconDataUrl, onReady },
   ref,
 ) {
   const displayName = getDisplayName(profile);
@@ -90,6 +91,7 @@ const FifaCard = forwardRef<HTMLElement, FifaCardProps>(function FifaCard(
     
     if (!avatarSrc) {
       setProcessedAvatarSrc("/assets/placeholderforProfile.png");
+      if (onReady) onReady();
       return;
     }
 
@@ -221,13 +223,25 @@ const FifaCard = forwardRef<HTMLElement, FifaCardProps>(function FifaCard(
             alt={`${displayName} avatar`}
             crossOrigin="anonymous"
             referrerPolicy="no-referrer"
-            onError={() => setAvatarLoadError(true)}
+            onError={() => {
+              setAvatarLoadError(true);
+              if (onReady) onReady();
+            }}
+            onLoad={() => {
+              if (onReady) onReady();
+            }}
             className="w-full h-full object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)]"
           />
         ) : (
           <img
             src="/assets/placeholderforProfile.png"
             alt={`${displayName} placeholder avatar`}
+            onLoad={() => {
+              if (onReady) onReady();
+            }}
+            onError={() => {
+              if (onReady) onReady();
+            }}
             className="w-full h-full object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)]"
           />
         )}
