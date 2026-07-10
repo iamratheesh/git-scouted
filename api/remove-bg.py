@@ -2,6 +2,11 @@ from http.server import BaseHTTPRequestHandler
 import json
 import base64
 import io
+import os
+
+# Set U2NET_HOME to a writable folder in Vercel's read-only environment
+os.environ["U2NET_HOME"] = "/tmp/.u2net"
+
 from PIL import Image
 from rembg import remove, new_session
 
