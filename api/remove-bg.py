@@ -13,11 +13,24 @@ ALLOWED_ORIGIN = os.environ.get("BG_REMOVE_CORS_ORIGIN", "*")
 from PIL import Image
 from rembg import remove, new_session
 
-# Preload session with the lightweight u2netp model globally to optimize cold starts
+# Prefer portrait-oriented sessions first, then fall back to lighter general models.
+MODEL_PREFERENCE = ("birefnet_portrait", "u2net_human_seg", "u2netp")
+
 try:
-    session = new_session("u2netp")
+    session = None
+    session_model = None
+    for model_name in MODEL_PREFERENCE:
+        try:
+            session = new_session(model_name)
+            session_model = model_name
+            break
+        except Exception as model_error:
+            print(f"Error preloading rembg session '{model_name}': {model_error}")
+    if session is None:
+        raise RuntimeError("No rembg session could be initialized")
 except Exception as e:
     session = None
+    session_model = None
     print(f"Error preloading rembg session: {e}")
 
 class handler(BaseHTTPRequestHandler):
@@ -120,13 +133,8 @@ class handler(BaseHTTPRequestHandler):
             # Load image using Pillow
             input_image = Image.open(io.BytesIO(image_bytes))
             
-            # Use global session or create it if not initialized
-            global session
-            if session is None:
-                session = new_session("u2netp")
-                
-            # Process background removal
-            output_image = remove(input_image, session=session)
+            # Use the best available session and fall back if the output still looks opaque.
+            output_image = process_with_fallback_models(input_image)
             
             # Save output as PNG to preserve transparency
             out_buf = io.BytesIO()
@@ -163,6 +171,50 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         response = {"error": message}
         self.wfile.write(json.dumps(response).encode('utf-8'))
+
+def process_with_fallback_models(input_image: Image.Image) -> Image.Image:
+    global session, session_model
+
+    tried_models = []
+    model_order = []
+
+    if session_model:
+        model_order.append(session_model)
+    model_order.extend([model for model in MODEL_PREFERENCE if model != session_model])
+
+    for model_name in model_order:
+        tried_models.append(model_name)
+
+        active_session = session if model_name == session_model and session is not None else None
+        if active_session is None:
+            try:
+                active_session = new_session(model_name)
+            except Exception as model_error:
+                print(f"[backgroundRemoval] Failed to initialize model '{model_name}': {model_error}")
+                continue
+
+        try:
+            output_image = remove(input_image, session=active_session)
+        except Exception as model_error:
+            print(f"[backgroundRemoval] Model '{model_name}' failed during removal: {model_error}")
+            continue
+
+        if image_has_transparency(output_image):
+            session = active_session
+            session_model = model_name
+            return output_image
+
+        print(f"[backgroundRemoval] Model '{model_name}' returned an opaque image; trying fallback.")
+
+    raise RuntimeError(f"Background removal produced no transparent result after trying: {', '.join(tried_models)}")
+
+
+def image_has_transparency(image: Image.Image) -> bool:
+    rgba = image.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    min_alpha, max_alpha = alpha.getextrema()
+    return min_alpha < 255 and max_alpha > 0
+
 
 if __name__ == '__main__':
     from http.server import HTTPServer
