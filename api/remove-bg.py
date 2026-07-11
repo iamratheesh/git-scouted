@@ -3,6 +3,7 @@ import json
 import base64
 import io
 import os
+from collections import deque
 
 # Set U2NET_HOME to a writable folder for the background-removal runtime.
 os.environ["U2NET_HOME"] = "/tmp/.u2net"
@@ -180,7 +181,7 @@ def process_image(input_image: Image.Image) -> Image.Image:
 
     session = active_session
     session_model = MODEL_NAME
-    return output_image
+    return remove_edge_background(output_image)
 
 
 def ensure_session():
@@ -202,6 +203,62 @@ def resize_image(image: Image.Image, max_size: int) -> Image.Image:
     scale = max_size / float(largest_side)
     new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
     return rgba.resize(new_size, Image.Resampling.LANCZOS)
+
+
+def remove_edge_background(image: Image.Image, tolerance: int = 28) -> Image.Image:
+    rgba = image.convert("RGBA")
+    pixels = rgba.load()
+    width, height = rgba.size
+
+    corners = [
+        rgba.getpixel((0, 0)),
+        rgba.getpixel((width - 1, 0)),
+        rgba.getpixel((0, height - 1)),
+        rgba.getpixel((width - 1, height - 1)),
+    ]
+    background = tuple(sum(channel[i] for channel in corners) // len(corners) for i in range(3))
+
+    def is_background(pixel):
+        if pixel[3] == 0:
+            return True
+        return (
+            abs(pixel[0] - background[0]) <= tolerance
+            and abs(pixel[1] - background[1]) <= tolerance
+            and abs(pixel[2] - background[2]) <= tolerance
+        )
+
+    queue = deque()
+    visited = set()
+
+    def enqueue(x, y):
+        if (x, y) in visited:
+            return
+        if is_background(pixels[x, y]):
+            visited.add((x, y))
+            queue.append((x, y))
+
+    for x in range(width):
+        enqueue(x, 0)
+        enqueue(x, height - 1)
+    for y in range(height):
+        enqueue(0, y)
+        enqueue(width - 1, y)
+
+    while queue:
+        x, y = queue.popleft()
+        r, g, b, _ = pixels[x, y]
+        pixels[x, y] = (r, g, b, 0)
+
+        if x > 0:
+            enqueue(x - 1, y)
+        if x < width - 1:
+            enqueue(x + 1, y)
+        if y > 0:
+            enqueue(x, y - 1)
+        if y < height - 1:
+            enqueue(x, y + 1)
+
+    return rgba
 
 
 if __name__ == '__main__':
