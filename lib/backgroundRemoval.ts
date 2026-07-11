@@ -1,10 +1,19 @@
 /**
  * Removes the background of an image URL by converting it to base64,
- * posting it to /api/remove-bg, and returning the processed image.
+ * posting it to the configured background-removal service, and returning
+ * the processed image.
  * Falls back to the original image URL on failure or timeout.
  */
 export async function removeBackground(imageUrl: string): Promise<string> {
   if (!imageUrl) return imageUrl;
+
+  const endpoint = getBackgroundRemovalEndpoint();
+  if (!endpoint) {
+    console.warn(
+      "[backgroundRemoval] No background-removal endpoint is configured; returning original image."
+    );
+    return imageUrl;
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
@@ -29,7 +38,7 @@ export async function removeBackground(imageUrl: string): Promise<string> {
     const base64Image = await blobToBase64(blob);
 
     // 3. Post base64 image to the API
-    const apiResponse = await fetch("/api/remove-bg", {
+    const apiResponse = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -56,6 +65,17 @@ export async function removeBackground(imageUrl: string): Promise<string> {
     console.error("[backgroundRemoval] Background removal failed, falling back to original:", error);
     return imageUrl;
   }
+}
+
+function getBackgroundRemovalEndpoint(): string | null {
+  const configured = process.env.NEXT_PUBLIC_BG_REMOVE_URL?.trim();
+  if (configured) return configured;
+
+  if (process.env.NODE_ENV === "development") {
+    return "http://localhost:5328/api/remove-bg";
+  }
+
+  return null;
 }
 
 /**

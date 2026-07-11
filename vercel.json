@@ -1,8 +1,0 @@
-{
-  "functions": {
-    "api/remove-bg.py": {
-      "memory": 2048,
-      "maxDuration": 10
-    }
-  }
-}

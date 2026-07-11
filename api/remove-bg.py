@@ -4,8 +4,11 @@ import base64
 import io
 import os
 
-# Set U2NET_HOME to a writable folder in Vercel's read-only environment
+# Set U2NET_HOME to a writable folder for the background-removal runtime.
 os.environ["U2NET_HOME"] = "/tmp/.u2net"
+# Disable numba JIT to avoid import-time cache errors in this environment.
+os.environ["NUMBA_DISABLE_JIT"] = "1"
+ALLOWED_ORIGIN = os.environ.get("BG_REMOVE_CORS_ORIGIN", "*")
 
 from PIL import Image
 from rembg import remove, new_session
@@ -18,6 +21,12 @@ except Exception as e:
     print(f"Error preloading rembg session: {e}")
 
 class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_cors_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_POST(self):
         try:
             content_length = int(self.headers.get('Content-Length', 0))
@@ -130,6 +139,7 @@ class handler(BaseHTTPRequestHandler):
             # Send success response
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_cors_headers()
             self.end_headers()
             
             response = {
@@ -140,9 +150,16 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_error_response(500, f"Error processing background removal: {str(e)}")
             
+    def send_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Vary", "Origin")
+
     def send_error_response(self, status_code, message):
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json')
+        self.send_cors_headers()
         self.end_headers()
         response = {"error": message}
         self.wfile.write(json.dumps(response).encode('utf-8'))
@@ -156,4 +173,3 @@ if __name__ == '__main__':
         server.serve_forever()
     except KeyboardInterrupt:
         pass
-
