@@ -13,25 +13,12 @@ ALLOWED_ORIGIN = os.environ.get("BG_REMOVE_CORS_ORIGIN", "*")
 from PIL import Image
 from rembg import remove, new_session
 
-# Prefer portrait-oriented sessions first, then fall back to lighter general models.
-MODEL_PREFERENCE = ("birefnet_portrait", "u2net_human_seg", "u2netp")
+# Keep the free-tier footprint small by using a single lightweight model.
+MODEL_NAME = os.environ.get("BG_REMOVE_MODEL", "u2netp").strip() or "u2netp"
+MAX_INPUT_SIZE = int(os.environ.get("BG_REMOVE_MAX_INPUT_SIZE", "768"))
 
-try:
-    session = None
-    session_model = None
-    for model_name in MODEL_PREFERENCE:
-        try:
-            session = new_session(model_name)
-            session_model = model_name
-            break
-        except Exception as model_error:
-            print(f"Error preloading rembg session '{model_name}': {model_error}")
-    if session is None:
-        raise RuntimeError("No rembg session could be initialized")
-except Exception as e:
-    session = None
-    session_model = None
-    print(f"Error preloading rembg session: {e}")
+session = None
+session_model = None
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -133,8 +120,8 @@ class handler(BaseHTTPRequestHandler):
             # Load image using Pillow
             input_image = Image.open(io.BytesIO(image_bytes))
             
-            # Use the best available session and fall back if the output still looks opaque.
-            output_image = process_with_fallback_models(input_image)
+            # Use the lightweight model after resizing to keep memory use low.
+            output_image = process_image(input_image)
             
             # Save output as PNG to preserve transparency
             out_buf = io.BytesIO()
@@ -172,48 +159,49 @@ class handler(BaseHTTPRequestHandler):
         response = {"error": message}
         self.wfile.write(json.dumps(response).encode('utf-8'))
 
-def process_with_fallback_models(input_image: Image.Image) -> Image.Image:
+def process_image(input_image: Image.Image) -> Image.Image:
     global session, session_model
 
-    tried_models = []
-    model_order = []
+    prepared_image = resize_image(input_image, MAX_INPUT_SIZE)
+    active_session = ensure_session()
 
-    if session_model:
-        model_order.append(session_model)
-    model_order.extend([model for model in MODEL_PREFERENCE if model != session_model])
+    try:
+        output_image = remove(
+            prepared_image,
+            session=active_session,
+            alpha_matting=True,
+            alpha_matting_foreground_threshold=240,
+            alpha_matting_background_threshold=10,
+            alpha_matting_erode_size=10,
+        )
+    except TypeError:
+        # Older rembg builds may not support alpha_matting args in every runtime.
+        output_image = remove(prepared_image, session=active_session)
 
-    for model_name in model_order:
-        tried_models.append(model_name)
-
-        active_session = session if model_name == session_model and session is not None else None
-        if active_session is None:
-            try:
-                active_session = new_session(model_name)
-            except Exception as model_error:
-                print(f"[backgroundRemoval] Failed to initialize model '{model_name}': {model_error}")
-                continue
-
-        try:
-            output_image = remove(input_image, session=active_session)
-        except Exception as model_error:
-            print(f"[backgroundRemoval] Model '{model_name}' failed during removal: {model_error}")
-            continue
-
-        if image_has_transparency(output_image):
-            session = active_session
-            session_model = model_name
-            return output_image
-
-        print(f"[backgroundRemoval] Model '{model_name}' returned an opaque image; trying fallback.")
-
-    raise RuntimeError(f"Background removal produced no transparent result after trying: {', '.join(tried_models)}")
+    session = active_session
+    session_model = MODEL_NAME
+    return output_image
 
 
-def image_has_transparency(image: Image.Image) -> bool:
+def ensure_session():
+    global session, session_model
+    if session is None:
+        print(f"[backgroundRemoval] Initializing rembg session '{MODEL_NAME}'")
+        session = new_session(MODEL_NAME)
+        session_model = MODEL_NAME
+    return session
+
+
+def resize_image(image: Image.Image, max_size: int) -> Image.Image:
     rgba = image.convert("RGBA")
-    alpha = rgba.getchannel("A")
-    min_alpha, max_alpha = alpha.getextrema()
-    return min_alpha < 255 and max_alpha > 0
+    width, height = rgba.size
+    largest_side = max(width, height)
+    if largest_side <= max_size:
+        return rgba
+
+    scale = max_size / float(largest_side)
+    new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+    return rgba.resize(new_size, Image.Resampling.LANCZOS)
 
 
 if __name__ == '__main__':
