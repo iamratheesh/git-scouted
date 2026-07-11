@@ -166,9 +166,9 @@ class handler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     from http.server import HTTPServer
-    port = 5328
-    server = HTTPServer(('localhost', port), handler)
-    print(f"Local Python background removal server running at http://localhost:{port}")
+    port = int(os.environ.get("PORT", 5328))
+    server = HTTPServer(("0.0.0.0", port), handler)
+    print(f"Python background removal server running on 0.0.0.0:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
