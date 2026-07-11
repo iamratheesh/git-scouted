@@ -15,18 +15,9 @@ export async function removeBackground(imageUrl: string): Promise<string> {
     return imageUrl;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    console.warn(`[backgroundRemoval] Timeout reached (8s) for background removal of image: ${imageUrl}`);
-  }, 8000); // 8 seconds timeout (under Hobby-plan 10s timeout)
-
   try {
-    // 1. Fetch original image as a blob
-    const response = await fetch(imageUrl, {
-      signal: controller.signal,
-      credentials: "omit"
-    });
+    // 1. Fetch original image as a blob with a short timeout.
+    const response = await fetchWithTimeout(imageUrl, 10000);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch original image: ${response.statusText}`);
@@ -37,17 +28,14 @@ export async function removeBackground(imageUrl: string): Promise<string> {
     // 2. Convert blob to base64
     const base64Image = await blobToBase64(blob);
 
-    // 3. Post base64 image to the API
-    const apiResponse = await fetch(endpoint, {
+    // 3. Post base64 image to the API with a longer timeout for cold starts.
+    const apiResponse = await fetchWithTimeout(endpoint, 45000, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ image: base64Image }),
-      signal: controller.signal
+      body: JSON.stringify({ image: base64Image })
     });
-
-    clearTimeout(timeoutId);
 
     if (!apiResponse.ok) {
       const errorData = await apiResponse.json().catch(() => ({}));
@@ -61,7 +49,6 @@ export async function removeBackground(imageUrl: string): Promise<string> {
 
     throw new Error("API response did not contain the processed image");
   } catch (error) {
-    clearTimeout(timeoutId);
     console.error("[backgroundRemoval] Background removal failed, falling back to original:", error);
     return imageUrl;
   }
@@ -76,6 +63,25 @@ function getBackgroundRemovalEndpoint(): string | null {
   }
 
   return null;
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  timeoutMs: number,
+  init?: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+      credentials: init?.credentials ?? "omit",
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
